@@ -111,6 +111,19 @@ class Multisite_Multidomain_Single_Sign_On {
 			return $url;
 		}
 
+		// Add support for Mercator aliases.
+		if ( defined( '\Mercator\VERSION' ) ) {
+			$mapping = \Mercator\Mapping::get_by_site( $target_site );
+
+			// We're only grabbing the first active alias that we find...
+			if ( ! empty( $mapping ) && $mapping[0]->is_active() ) {
+				$mapping = $mapping[0];
+
+				// Rewrite site URL to use the alias domain.
+				$url = sprintf( '%1$s://%2$s%3$s', $target_url_parts['scheme'], $mapping->get_domain(), $target_url_parts['path'] );
+			}
+		}
+
 		$nonce = wp_create_nonce( MMSSO_NONCE_PREFIX . $current_site_id . '-' . $target_site->blog_id );
 
 		return add_query_arg(
@@ -173,7 +186,17 @@ class Multisite_Multidomain_Single_Sign_On {
 		$url_parts          = explode( '/', $return_url );
 		$requesting_site_id = get_blog_id_from_url( $url_parts[2] );
 		if ( empty( $requesting_site_id ) ) {
-			wp_die( 'Single Sign On failed. The requested site could not be found on this network. If someone gave you this link, they may have sent you a phishing attack.' );
+			// Also look up if the site is using a Mercator alias.
+			if ( defined( '\Mercator\VERSION' ) ) {
+				$mapping = \Mercator\Mapping::get_by_domain( $url_parts[2] );
+				if ( ! empty( $mapping ) && $mapping->is_active() ) {
+					$requesting_site_id = $mapping->get_site_id();
+				}
+			}
+
+			if ( empty( $requesting_site_id ) ) {
+				wp_die( 'Single Sign On failed. The requested site could not be found on this network. If someone gave you this link, they may have sent you a phishing attack.' );
+			}
 		}
 
 		if ( empty( $_GET[ MMSSO_NONCE ] ) || ! wp_verify_nonce( $_GET[ MMSSO_NONCE ],
