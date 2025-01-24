@@ -113,16 +113,18 @@ class Multisite_Multidomain_Single_Sign_On {
 
 		// Add support for Mercator aliases.
 		if ( defined( '\Mercator\VERSION' ) ) {
-			$mapping = \Mercator\Mapping::get_by_site( $target_site );
+			// See if the target site is mapped.
+			$mapping = self::get_mercator_alias( $target_site->id );
 
-			// We're only grabbing the first active alias that we find...
-			if ( ! empty( $mapping ) && $mapping[0]->is_active() ) {
-				$mapping = $mapping[0];
-
-				// Rewrite site URL to use the alias domain.
-				$url = sprintf( '%1$s://%2$s%3$s', $target_url_parts['scheme'], $mapping->get_domain(), $target_url_parts['path'] );
+			// We're using a mapped domain.
+			if ( false !== $mapping ) {
+				// Set the target host to use the alias domain.
+				$target_url_parts['host'] = $mapping->get_domain();
 			}
 		}
+
+		// Set URL again.
+		$url = sprintf( '%1$s://%2$s%3$s', $target_url_parts['scheme'], $target_url_parts['host'], $target_url_parts['path'] );
 
 		$nonce = wp_create_nonce( MMSSO_NONCE_PREFIX . $current_site_id . '-' . $target_site->blog_id );
 
@@ -188,8 +190,11 @@ class Multisite_Multidomain_Single_Sign_On {
 		if ( empty( $requesting_site_id ) ) {
 			// Also look up if the site is using a Mercator alias.
 			if ( defined( '\Mercator\VERSION' ) ) {
-				$mapping = \Mercator\Mapping::get_by_domain( $url_parts[2] );
-				if ( ! empty( $mapping ) && $mapping->is_active() ) {
+				// See if the target site is mapped.
+				$mapping = self::get_mercator_alias( $url_parts[2] );
+
+				// Use the correct site ID for our mapped domain.
+				if ( false !== $mapping ) {
 					$requesting_site_id = $mapping->get_site_id();
 				}
 			}
@@ -306,6 +311,47 @@ class Multisite_Multidomain_Single_Sign_On {
 		return hash_hmac( 'sha256', $thing, AUTH_SALT );
 	}
 
+	/**
+	 * Returns the first, active mapped domain object for a site ID or domain.
+	 *
+	 * Must be using Mercator.
+	 *
+	 * @param  int|string $site_id WP site ID or domain host to query for. If querying by mapped domain host,
+	 *                             must not include scheme.
+	 * @return \Mercator\Mapping|bool Mercator mapping object on success, boolean false on failure.
+	 */
+	public static function get_mercator_alias( $site_id_or_domain ) {
+		if ( ! defined( '\Mercator\VERSION' ) ) {
+			return false;
+		}
+
+		// See if the target site is mapped.
+		if ( is_numeric( $site_id_or_domain ) ) {
+			// Returns an array on success.
+			$mappings = \Mercator\Mapping::get_by_site( $site_id_or_domain );
+		} else {
+			$mappings = \Mercator\Mapping::get_by_domain( $site_id_or_domain );
+
+			// Returns singular, so need to set as an array.
+			if ( ! empty( $mappings ) ) {
+				$mappings = [
+					$mappings
+				];
+			}
+		}
+
+		if ( ! empty( $mappings ) ) {
+			// Loop through all mapped domains.
+			foreach ( $mappings as $mapping ) {
+				// We're only using the first, active mapped alias...
+				if ( $mapping->is_active() ) {
+					return $mapping;
+				}
+			}
+		}
+
+		return false;
+	}
 }
 
 Multisite_Multidomain_Single_Sign_On::get_instance();
