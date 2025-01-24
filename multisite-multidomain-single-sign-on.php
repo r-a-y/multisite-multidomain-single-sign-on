@@ -118,6 +118,11 @@ class Multisite_Multidomain_Single_Sign_On {
 
 			// We're using a mapped domain.
 			if ( false !== $mapping ) {
+				// Don't do this if we're already on the mapped domain.
+				if ( $current_site_id === $mapping->get_site_id() ) {
+					return $url;
+				}
+
 				// Set the target host to use the alias domain.
 				$target_url_parts['host'] = $mapping->get_domain();
 			}
@@ -157,6 +162,19 @@ class Multisite_Multidomain_Single_Sign_On {
 			wp_die( 'Single Sign On is attempting to use an invalid site on this multisite.' );
 		}
 
+		$sso_site_url = get_site_url( $coming_from );
+
+		// Use Mercator alias for SSO site URL if necessary.
+		if ( defined( '\Mercator\VERSION' ) ) {
+			// See if the target site is mapped.
+			$mapping = self::get_mercator_alias( $coming_from );
+
+			// Set SSO site URL to use the alias domain.
+			if ( false !== $mapping ) {
+				$sso_site_url = sprintf( '%1$s://%2$s', wp_parse_url( $sso_site_url, PHP_URL_SCHEME ), $mapping->get_domain() );
+			}
+		}
+
 		if ( empty( $_GET[ MMSSO_NONCE ] ) ) { // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.NonceVerification.Recommended
 			wp_die( 'Single Sign On was attempted with a missing key.' );
 		}
@@ -165,7 +183,7 @@ class Multisite_Multidomain_Single_Sign_On {
 		$next_url   = add_query_arg( [
 			MMSSO_RETURN_TO_QUERY_VAR => $return_url,
 			MMSSO_NONCE               => sanitize_text_field( $_GET[ MMSSO_NONCE ] ), // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		], get_site_url( $coming_from ) );
+		], $sso_site_url );
 		wp_redirect( $next_url );
 		exit();
 	}
