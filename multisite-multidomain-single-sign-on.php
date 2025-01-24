@@ -101,8 +101,9 @@ class Multisite_Multidomain_Single_Sign_On {
 
 			return $url;
 		}
-		$site = get_site( $current_site_id );
-		if ( $target_url_parts['host'] === $site->domain ) {
+		$site      = get_site( $current_site_id );
+		$site_host = $site->domain;
+		if ( $target_url_parts['host'] === $site_host ) {
 
 			return $url;
 		}
@@ -113,6 +114,11 @@ class Multisite_Multidomain_Single_Sign_On {
 
 		// Add support for Mercator aliases.
 		if ( defined( '\Mercator\VERSION' ) ) {
+			// If the current site is mapped, use the mapped domain as the site host.
+			if ( ! empty( $GLOBALS['mercator_current_mapping'] ) ) {
+				$site_host = $GLOBALS['mercator_current_mapping']->get_domain();
+			}
+
 			// See if the target site is mapped.
 			$mapping = self::get_mercator_alias( $target_site->id );
 
@@ -126,6 +132,30 @@ class Multisite_Multidomain_Single_Sign_On {
 				// Set the target host to use the alias domain.
 				$target_url_parts['host'] = $mapping->get_domain();
 			}
+		}
+
+		/*
+		 * Check to see if current site is a subdomain of the network site.
+		 *
+		 * If so, use this as our subdomain host check in the next conditional block.
+		 */
+		$network_host             = wp_parse_url( network_site_url(), PHP_URL_HOST );
+		$network_subdomain_check1 = strpos( $site_host, '.' . $network_host );
+		$network_subdomain_check2 = strrpos( $site_host, '.' . $network_host );
+		if ( false !== $network_subdomain_check1 && false !== $network_subdomain_check2 && ( $network_subdomain_check1 === $network_subdomain_check2 ) ) {
+			$site_host = $network_host;
+		}
+
+		// Bail if the target site is a subdomain of the current site.
+		$subdomain_check1 = strpos( $target_url_parts['host'], '.' . $site_host );
+		$subdomain_check2 = strrpos( $target_url_parts['host'], '.' . $site_host );
+		if ( false !== $subdomain_check1 && false !== $subdomain_check2 && ( $subdomain_check1 === $subdomain_check2 ) ) {
+			return $url;
+		}
+
+		// If network host and site host matches the target site, bail.
+		if ( $network_host === $target_site->domain && $site_host === $target_site->domain ) {
+			return $url;
 		}
 
 		// Set URL again.
