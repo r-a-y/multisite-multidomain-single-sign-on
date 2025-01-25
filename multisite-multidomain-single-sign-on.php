@@ -73,8 +73,9 @@ class Multisite_Multidomain_Single_Sign_On {
 
 			$is_site_node          = ( 0 === stripos( $id, 'blog' ) );
 			$is_network_admin_node = ( 0 === stripos( $id, 'network-admin' ) );
+			$is_edit_site_node     = ( 0 === stripos( $id, 'edit-site' ) );
 
-			if ( ! ( $is_site_node || $is_network_admin_node ) ) {
+			if ( ! ( $is_site_node || $is_network_admin_node || $is_edit_site_node ) ) {
 				continue;
 			}
 
