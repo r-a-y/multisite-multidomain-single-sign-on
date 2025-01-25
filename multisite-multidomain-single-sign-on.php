@@ -160,7 +160,14 @@ class Multisite_Multidomain_Single_Sign_On {
 		}
 
 		// Set URL again.
-		$url = sprintf( '%1$s://%2$s%3$s', $target_url_parts['scheme'], $target_url_parts['host'], $target_url_parts['path'] );
+		$url = sprintf(
+			'%s://%s%s%s%s',
+			$target_url_parts['scheme'],
+			$target_url_parts['host'],
+			$target_url_parts['path'] ?? '',
+			isset( $target_url_parts['query'] ) ? '?' . $target_url_parts['query'] : '',
+			isset( $target_url_parts['fragment'] ) ? '#' . $target_url_parts['fragment'] : ''
+		);
 
 		$nonce = wp_create_nonce( MMSSO_NONCE_PREFIX . $current_site_id . '-' . $target_site->blog_id );
 
